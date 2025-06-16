@@ -1,7 +1,7 @@
-// script.js - Basic frontend logic
 function login() {
-    window.location.href = '/login';
+    window.location.href = 'http://127.0.0.1:8000/login';
 }
+
 function createPlaylist() {
-    alert("Playlist creation not implemented in this demo");
+    alert("Playlist creation not implemented in this demo.");
 }
