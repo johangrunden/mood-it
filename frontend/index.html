@@ -1,6 +1,7 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+    <meta charset="UTF-8">
     <title>Mood It</title>
     <link rel="stylesheet" href="styles.css">
 </head>
@@ -8,10 +9,23 @@
     <h1>Mood It</h1>
     <div id="app">
         <button onclick="login()">Login with Spotify</button>
-        <div id="mood-buttons"></div>
+
+        <h2>Choose your mood:</h2>
+        <div id="mood-buttons">
+            <button onclick="selectMood('happy')">😊 Happy</button>
+            <button onclick="selectMood('sad')">😢 Sad</button>
+            <button onclick="selectMood('chill')">🧊 Chill</button>
+            <button onclick="selectMood('focus')">🧘 Focus</button>
+            <button onclick="selectMood('energetic')">⚡ Energetic</button>
+            <button onclick="showAllLiked()">🎵 Show all liked songs</button>
+        </div>
+
+        <h2>Suggested tracks:</h2>
         <ul id="track-list"></ul>
-        <button onclick="createPlaylist()">Create Playlist</button>
+
+        <button onclick="createPlaylist()">🎧 Create Playlist</button>
     </div>
+
     <script src="script.js"></script>
 </body>
 </html>
