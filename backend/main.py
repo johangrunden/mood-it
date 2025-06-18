@@ -1,5 +1,5 @@
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Body
 from fastapi.responses import RedirectResponse, JSONResponse
 import requests
 from dotenv import load_dotenv
@@ -109,7 +109,7 @@ def fetch_all_liked_tracks(headers):
         offset += limit
 
     return all_tracks
-    
+
 @app.get("/all-liked-tracks")
 def all_liked_tracks():
     global ACCESS_TOKEN
@@ -136,37 +136,90 @@ def mood_tracks(mood: str):
         return JSONResponse(status_code=401, content={"error": "Not authenticated"})
 
     headers = {"Authorization": f"Bearer {ACCESS_TOKEN}"}
-    all_tracks = fetch_all_liked_tracks(headers)
+    all_items = fetch_all_liked_tracks(headers)
+    mood_genres = MOOD_GENRES.get(mood, [])
 
-    mood_tracks = []
+    matched_tracks = []
 
-    for item in all_tracks:
+    for item in all_items:
         track = item.get("track")
         if not track:
             continue
-        name = track["name"]
+
         artist_info = track["artists"][0]
         artist_id = artist_info["id"]
-        artist_name = artist_info["name"]
 
-        # Fetch artist's genres
         artist_response = requests.get(f"https://api.spotify.com/v1/artists/{artist_id}", headers=headers)
         if artist_response.status_code != 200:
             continue
 
         genres = artist_response.json().get("genres", [])
-        match = any(
-            any(mood_genre in genre for mood_genre in MOOD_GENRES.get(mood, []))
-            for genre in genres
-        )
 
-        if match:
-            mood_tracks.append({
-                "name": name,
-                "artist": artist_name,
-                "genres": genres
+        if any(mood_genre in genre for genre in genres for mood_genre in mood_genres):
+            matched_tracks.append({
+                "name": track["name"],
+                "artist": artist_info["name"],
+                "uri": track["uri"]
             })
 
-    print(f"Total matched tracks for mood '{mood}': {len(mood_tracks)}")
-    return mood_tracks
+    return matched_tracks
 
+@app.post("/create-playlist")
+def create_playlist(payload: dict = Body(...)):
+    global ACCESS_TOKEN
+    if not ACCESS_TOKEN:
+        return JSONResponse(status_code=401, content={"error": "Not authenticated"})
+
+    # Extract mood and track URIs from request body
+    mood = payload.get("mood")
+    uris = payload.get("uris", [])
+    if not uris:
+        return JSONResponse(status_code=400, content={"error": "No tracks provided"})
+
+    headers = {
+        "Authorization": f"Bearer {ACCESS_TOKEN}",
+        "Content-Type": "application/json"
+    }
+
+    # Fetch current user's Spotify ID
+    profile_resp = requests.get("https://api.spotify.com/v1/me", headers=headers)
+    if profile_resp.status_code != 200:
+        return JSONResponse(status_code=profile_resp.status_code,
+                            content={"error": "Failed to fetch user profile"})
+    user_id = profile_resp.json()["id"]
+
+    # Create a new playlist named “Mood It – {Mood}”
+    playlist_body = {
+        "name": f"Mood It – {mood.capitalize()}",
+        "description": f"Automatically generated playlist for mood: {mood}",
+        "public": True
+    }
+    create_resp = requests.post(
+        f"https://api.spotify.com/v1/users/{user_id}/playlists",
+        headers=headers,
+        json=playlist_body
+    )
+    if create_resp.status_code != 201:
+        return JSONResponse(status_code=create_resp.status_code,
+                            content={"error": "Failed to create playlist"})
+
+    playlist_id = create_resp.json()["id"]
+    playlist_url = create_resp.json()["external_urls"]["spotify"]
+
+    # Add tracks to the new playlist in batches of 100 (Spotify limit)
+    for i in range(0, len(uris), 100):
+        batch = uris[i:i + 100]
+        add_resp = requests.post(
+            f"https://api.spotify.com/v1/playlists/{playlist_id}/tracks",
+            headers=headers,
+            json={"uris": batch}
+        )
+        if add_resp.status_code not in (200, 201):
+            return JSONResponse(status_code=add_resp.status_code,
+                                content={"error": "Failed to add tracks"})
+
+    # Return success message and playlist URL
+    return {
+        "message": "Playlist created successfully",
+        "playlist_url": playlist_url
+    }
