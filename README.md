@@ -1,4 +1,4 @@
-# Mood It - Project is paused since Get Track's Audio Features is deprecated
+# Mood It
 
 Create Spotify playlists based on your current mood using your liked tracks.
 

@@ -23,6 +23,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# AI-generated genre mappings for each mood
+MOOD_GENRES = {
+    "happy": ["pop", "dance pop", "sunshine pop", "nu-disco"],
+    "sad": ["sad", "melancholia", "acoustic", "slowcore"],
+    "energetic": ["edm", "electro", "trap", "hard rock", "drum and bass"],
+    "chill": ["lo-fi", "chillhop", "ambient", "jazz", "downtempo"],
+    "focus": ["instrumental", "piano", "classical", "ambient"]
+}
+
 @app.get("/")
 def root():
     return {"message": "Mood It backend is running"}
@@ -72,7 +81,7 @@ def all_liked_tracks():
     items = response.json().get("items", [])
     result = [{"name": t["track"]["name"], "artist": t["track"]["artists"][0]["name"]} for t in items if t["track"]]
     return result
-    
+
 @app.get("/mood-tracks")
 def mood_tracks(mood: str):
     global ACCESS_TOKEN
@@ -81,50 +90,39 @@ def mood_tracks(mood: str):
 
     headers = {"Authorization": f"Bearer {ACCESS_TOKEN}"}
     response = requests.get("https://api.spotify.com/v1/me/tracks?limit=50", headers=headers)
+
     if response.status_code != 200:
         return {"error": "Failed to get liked tracks"}
 
     items = response.json().get("items", [])
-    track_ids = [item["track"]["id"] for item in items if item["track"]]
+    mood_tracks = []
 
-    # Get audio features for all songs
-    features = []
-    for i in range(0, len(track_ids), 50):
-        batch = track_ids[i:i+50]
-        response = requests.get(
-            "https://api.spotify.com/v1/audio-features?ids=" + ",".join(batch),
-            headers=headers
+    for item in items:
+        track = item.get("track")
+        if not track:
+            continue
+        name = track["name"]
+        artist_info = track["artists"][0]
+        artist_id = artist_info["id"]
+        artist_name = artist_info["name"]
+
+        # Fetch artist's genres
+        artist_response = requests.get(f"https://api.spotify.com/v1/artists/{artist_id}", headers=headers)
+        if artist_response.status_code != 200:
+            continue
+
+        genres = artist_response.json().get("genres", [])
+        match = any(
+            any(mood_genre in genre for mood_genre in MOOD_GENRES.get(mood, []))
+            for genre in genres
         )
-        if response.status_code == 200:
-            batch_features = response.json().get("audio_features", [])
-            features.extend(batch_features)
-        else:
-            print("Error:", response.status_code, response.text)
 
-    # Filter songs
-    def mood_filter(f):
-        if not f:
-            return False
-        if mood == "happy":
-            return f["valence"] > 0.5 and f["energy"] > 0.4 and f["danceability"] > 0.4
-        elif mood == "sad":
-            return f["valence"] < 0.5 and f["energy"] < 0.6
-        elif mood == "focus":
-            return f["instrumentalness"] > 0.3 and f["energy"] < 0.6
-        elif mood == "energetic":
-            return f["energy"] > 0.6 and f["danceability"] > 0.5 and f["tempo"] > 100
-        elif mood == "chill":
-            return (
-                f["energy"] < 0.6 and
-                f["tempo"] < 115 and
-                f["valence"] < 0.65 and
-                (f["acousticness"] > 0.2 or f["instrumentalness"] > 0.1)
-            )
-        return True
+        if match:
+            mood_tracks.append({
+                "name": name,
+                "artist": artist_name,
+                "genres": genres
+            })
 
-    selected_ids = [f["id"] for f in features if mood_filter(f)]
-
-    selected_tracks = [t for t in items if t["track"]["id"] in selected_ids]
-
-    result = [{"name": t["track"]["name"], "artist": t["track"]["artists"][0]["name"]} for t in selected_tracks]
-    return result
+    print(f"Total matched tracks for mood '{mood}': {len(mood_tracks)}")
+    return mood_tracks
