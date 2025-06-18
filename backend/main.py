@@ -94,6 +94,7 @@ def fetch_all_liked_tracks(headers):
     limit = 50
     offset = 0
 
+    # Max-limit is 50 so fetch in batches
     while True:
         url = f"https://api.spotify.com/v1/me/tracks?limit={limit}&offset={offset}"
         response = requests.get(url, headers=headers)
@@ -128,7 +129,7 @@ def all_liked_tracks():
     ]
 
     return result
-
+ 
 @app.get("/mood-tracks")
 def mood_tracks(mood: str):
     global ACCESS_TOKEN
@@ -137,10 +138,40 @@ def mood_tracks(mood: str):
 
     headers = {"Authorization": f"Bearer {ACCESS_TOKEN}"}
     all_items = fetch_all_liked_tracks(headers)
+    print(f"Total liked tracks fetched: {len(all_items)}")
+
     mood_genres = MOOD_GENRES.get(mood, [])
+    print(f"Filtering tracks for mood: '{mood}' with genres: {mood_genres}")
 
+    # Extract unique artist IDs
+    artist_ids = {
+        item["track"]["artists"][0]["id"]
+        for item in all_items
+        if item.get("track")
+    }
+
+    # Batch-fetch artist genres (max-limit 50)
+    artist_genre_map = {}
+    artist_id_list = list(artist_ids)
+    for i in range(0, len(artist_id_list), 50):
+        batch = artist_id_list[i:i + 50]
+        print(f"Fetching artist genres for batch {i // 50 + 1}: {len(batch)} artists")
+        response = requests.get(
+            "https://api.spotify.com/v1/artists",
+            params={"ids": ",".join(batch)},
+            headers=headers
+        )
+        try:
+            response.raise_for_status()
+            artists = response.json().get("artists", [])
+            for artist in artists:
+                artist_genre_map[artist["id"]] = artist.get("genres", [])
+        except requests.exceptions.HTTPError as e:
+            print(f"Failed to fetch artist genres for batch {i // 50 + 1}: {e}")
+            continue
+
+    # Match tracks by mood
     matched_tracks = []
-
     for item in all_items:
         track = item.get("track")
         if not track:
@@ -148,20 +179,16 @@ def mood_tracks(mood: str):
 
         artist_info = track["artists"][0]
         artist_id = artist_info["id"]
+        artist_genres = artist_genre_map.get(artist_id, [])
 
-        artist_response = requests.get(f"https://api.spotify.com/v1/artists/{artist_id}", headers=headers)
-        if artist_response.status_code != 200:
-            continue
-
-        genres = artist_response.json().get("genres", [])
-
-        if any(mood_genre in genre for genre in genres for mood_genre in mood_genres):
+        if any(mood_genre in genre for genre in artist_genres for mood_genre in mood_genres):
             matched_tracks.append({
                 "name": track["name"],
                 "artist": artist_info["name"],
                 "uri": track["uri"]
             })
 
+    print(f"Tracks matching mood '{mood}': {len(matched_tracks)}")
     return matched_tracks
 
 @app.post("/create-playlist")
@@ -206,7 +233,7 @@ def create_playlist(payload: dict = Body(...)):
     playlist_id = create_resp.json()["id"]
     playlist_url = create_resp.json()["external_urls"]["spotify"]
 
-    # Add tracks to the new playlist in batches of 100 (Spotify limit)
+    # Add tracks to the new playlist in batches of 100 (limit)
     for i in range(0, len(uris), 100):
         batch = uris[i:i + 100]
         add_resp = requests.post(
