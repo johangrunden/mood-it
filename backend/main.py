@@ -5,6 +5,7 @@ import requests
 from dotenv import load_dotenv
 import os
 import base64
+import time
 
 load_dotenv()
 
@@ -129,7 +130,7 @@ def all_liked_tracks():
     ]
 
     return result
- 
+
 @app.get("/mood-tracks")
 def mood_tracks(mood: str):
     global ACCESS_TOKEN
@@ -150,25 +151,34 @@ def mood_tracks(mood: str):
         if item.get("track")
     }
 
-    # Batch-fetch artist genres (max-limit 50)
+    # Batch-fetch artist genres with rate limiting handling
     artist_genre_map = {}
     artist_id_list = list(artist_ids)
     for i in range(0, len(artist_id_list), 50):
         batch = artist_id_list[i:i + 50]
         print(f"Fetching artist genres for batch {i // 50 + 1}: {len(batch)} artists")
-        response = requests.get(
-            "https://api.spotify.com/v1/artists",
-            params={"ids": ",".join(batch)},
-            headers=headers
-        )
-        try:
-            response.raise_for_status()
-            artists = response.json().get("artists", [])
-            for artist in artists:
-                artist_genre_map[artist["id"]] = artist.get("genres", [])
-        except requests.exceptions.HTTPError as e:
-            print(f"Failed to fetch artist genres for batch {i // 50 + 1}: {e}")
-            continue
+
+        while True:
+            response = requests.get(
+                "https://api.spotify.com/v1/artists",
+                params={"ids": ",".join(batch)},
+                headers=headers
+            )
+
+            if response.status_code == 429:
+                retry_after = int(response.headers.get("Retry-After", 5))
+                print(f"Rate limited. Retrying in {retry_after} seconds...")
+                time.sleep(retry_after)
+                continue
+            try:
+                response.raise_for_status()
+                artists = response.json().get("artists", [])
+                for artist in artists:
+                    artist_genre_map[artist["id"]] = artist.get("genres", [])
+                break  # exit while-loop on success
+            except requests.exceptions.HTTPError as e:
+                print(f"Error fetching batch {i // 50 + 1}: {e}")
+                break  # don't retry on other HTTP errors
 
     # Match tracks by mood
     matched_tracks = []
