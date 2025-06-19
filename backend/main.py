@@ -3,9 +3,7 @@ from fastapi import FastAPI, Request, Body
 from fastapi.responses import RedirectResponse, JSONResponse
 import requests
 from dotenv import load_dotenv
-import os
-import base64
-import time
+import os, base64, time, json
 
 load_dotenv()
 
@@ -25,35 +23,8 @@ app.add_middleware(
 )
 
 # AI-generated genre mappings for each mood
-MOOD_GENRES = {
-    "happy": [
-        "pop", "dance pop", "sunshine pop", "nu-disco", "disco", "disco house", "funky house", "funk rock",
-        "freestyle", "future bass", "latin", "latin house", "latin indie", "italo disco", "italo dance",
-        "kizomba", "reggaeton", "tropical house", "afrobeats", "afrobeat", "alté", "afro r&b", "afro soul",
-        "christmas", "classic soul", "motown", "retro soul", "quiet storm", "bossa nova", "comedy"
-    ],
-    "sad": [
-        "sad", "melancholia", "acoustic", "slowcore", "emo", "neo-psychedelic", "shoegaze",
-        "indie soul", "neo soul", "indie r&b", "contemporary r&b", "minimalism", "new age",
-        "italian singer-songwriter", "mexican indie", "varieté française"
-    ],
-    "energetic": [
-        "edm", "electro", "trap", "hard rock", "drum and bass", "acid house", "bass house", "big beat",
-        "big room", "breakbeat", "gabber", "g-house", "g-funk", "gangster rap", "hard house",
-        "hi-nrg", "house", "metal", "nu metal", "post-punk", "punk", "rap metal", "southern hip hop",
-        "tech house", "trance", "progressive trance", "tribal house", "uk garage", "jungle", "breakcore"
-    ],
-    "chill": [
-        "lo-fi", "chillhop", "ambient", "jazz", "downtempo", "chillwave", "chillstep", "new wave",
-        "trip hop", "vaporwave", "lounge", "space rock", "idm", "minimal techno", "dub techno",
-        "math rock", "melodic house", "quiet storm", "new jack swing", "alté"
-    ],
-    "focus": [
-        "instrumental", "piano", "classical", "ambient", "minimalism", "new age", "melodic house",
-        "lo-fi", "idm", "lounge", "post-rock", "space rock", "minimal techno", "math rock",
-        "chillhop", "new wave"
-    ]
-}
+with open("ai_generated_mood_genres.json", "r", encoding="utf-8") as f:
+    MOOD_GENRES = json.load(f)
 
 @app.get("/")
 def root():
