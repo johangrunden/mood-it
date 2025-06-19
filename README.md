@@ -2,6 +2,16 @@
 
 Create Spotify playlists based on your current mood using your liked tracks.
 
+Why?
+I got so many liked songs in so many different genres and I wanted to find an easy way to only play selected songs based on my mood.
+I think this already exists in some regions for Spotify but I thought it would be fun to play around with Python and Spotify's API to do this.
+
+How?
+It scans your liked songs artist-genres. The genres are compared with a map of the genres and ceratin moods with the help of AI. The map is currently static and not all genres are available.
+
+Techniques:
+Backend: Python, FastAPI, uvicorn
+Frontend: HTML and JavaScript
 
 Setup:
 1. Install Python
