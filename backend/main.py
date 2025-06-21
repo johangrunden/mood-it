@@ -4,6 +4,9 @@ from fastapi.responses import RedirectResponse, JSONResponse
 import requests
 from dotenv import load_dotenv
 import os, base64, time, json
+from sentence_transformers import SentenceTransformer
+import numpy as np
+from embedding_init import model, centroids
 
 load_dotenv()
 
@@ -21,10 +24,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# AI-generated genre mappings for each mood
-with open("ai_generated_mood_genres.json", "r", encoding="utf-8") as f:
-    MOOD_GENRES = json.load(f)
 
 @app.get("/")
 def root():
@@ -110,66 +109,70 @@ def mood_tracks(mood: str):
 
     headers = {"Authorization": f"Bearer {ACCESS_TOKEN}"}
     all_items = fetch_all_liked_tracks(headers)
-    print(f"Total liked tracks fetched: {len(all_items)}")
+    print(f"[INFO] Total liked tracks fetched: {len(all_items)}")
 
-    mood_genres = MOOD_GENRES.get(mood, [])
-    print(f"Filtering tracks for mood: '{mood}' with genres: {mood_genres}")
-
-    # Extract unique artist IDs
     artist_ids = {
         item["track"]["artists"][0]["id"]
         for item in all_items
         if item.get("track")
     }
+    print(f"[INFO] Unique artist IDs found: {len(artist_ids)}")
 
-    # Batch-fetch artist genres with rate limiting handling
+    # Fetch artist genres
     artist_genre_map = {}
     artist_id_list = list(artist_ids)
     for i in range(0, len(artist_id_list), 50):
         batch = artist_id_list[i:i + 50]
-        print(f"Fetching artist genres for batch {i // 50 + 1}: {len(batch)} artists")
-
+        print(f"[INFO] Fetching genres for artist batch {i // 50 + 1} ({len(batch)} artists)")
         while True:
-            response = requests.get(
+            r = requests.get(
                 "https://api.spotify.com/v1/artists",
                 params={"ids": ",".join(batch)},
                 headers=headers
             )
-
-            if response.status_code == 429:
-                retry_after = int(response.headers.get("Retry-After", 5))
-                print(f"Rate limited. Retrying in {retry_after} seconds...")
+            if r.status_code == 429:
+                retry_after = int(r.headers.get("Retry-After", 5))
+                print(f"[WARNING] Rate limited. Retrying in {retry_after} seconds...")
                 time.sleep(retry_after)
                 continue
             try:
-                response.raise_for_status()
-                artists = response.json().get("artists", [])
-                for artist in artists:
-                    artist_genre_map[artist["id"]] = artist.get("genres", [])
-                break  # exit while-loop on success
+                r.raise_for_status()
+                for artist in r.json().get("artists", []):
+                    genres = artist.get("genres", [])
+                    artist_genre_map[artist["id"]] = genres
+                    print(f"[DEBUG] Artist: {artist['name']} | Genres: {genres}")
+                break
             except requests.exceptions.HTTPError as e:
-                print(f"Error fetching batch {i // 50 + 1}: {e}")
-                break  # don't retry on other HTTP errors
+                print(f"[ERROR] Failed to fetch artist batch {i // 50 + 1}: {e}")
+                break
 
-    # Match tracks by mood
+    # Classification time, calculate cosine similarity with the specific mood-centroid
+    mood_vec = centroids[mood]
     matched_tracks = []
     for item in all_items:
         track = item.get("track")
         if not track:
             continue
 
-        artist_info = track["artists"][0]
-        artist_id = artist_info["id"]
-        artist_genres = artist_genre_map.get(artist_id, [])
+        artist = track["artists"][0]
+        artist_genres = artist_genre_map.get(artist["id"], [])
+        if not artist_genres:
+            continue
 
-        if any(mood_genre in genre for genre in artist_genres for mood_genre in mood_genres):
+        genre_string = " ".join(artist_genres)
+        genre_vec = model.encode(genre_string)
+        sim = np.dot(mood_vec, genre_vec) / (np.linalg.norm(mood_vec) * np.linalg.norm(genre_vec))
+        print(f"[DEBUG] Track: {track['name']} | Artist: {artist['name']} | Similarity to '{mood}': {sim:.3f}")
+
+        if sim >= 0.55:  # Adjust threshold if needed
             matched_tracks.append({
                 "name": track["name"],
-                "artist": artist_info["name"],
-                "uri": track["uri"]
+                "artist": artist["name"],
+                "uri": track["uri"],
+                "similarity": round(float(sim), 3)
             })
 
-    print(f"Tracks matching mood '{mood}': {len(matched_tracks)}")
+    print(f"[INFO] {len(matched_tracks)} tracks matched the mood '{mood}' with similarity ≥ 0.6")
     return matched_tracks
 
 @app.post("/create-playlist")
