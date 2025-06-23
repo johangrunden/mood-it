@@ -145,11 +145,12 @@ def mood_tracks(mood: str):
             if not tag_string.strip():
                 continue
 
+            # Classification time, calculate cosine similarity with the specific mood-centroid
             tag_vec = model.encode(tag_string)
             sim = np.dot(mood_vec, tag_vec) / (np.linalg.norm(mood_vec) * np.linalg.norm(tag_vec))
             print(f"[DEBUG] Track: '{track_name}' by '{artist_name}' | Tags: {tags} | Similarity to '{mood}': {sim:.3f}")
 
-            if sim >= 0.4:
+            if sim >= 0.35:
                 matched_tracks.append({
                     "name": track_name,
                     "artist": artist_name,
@@ -162,7 +163,7 @@ def mood_tracks(mood: str):
 
         time.sleep(0.2)  # Respect API rate limits
 
-    print(f"[INFO] {len(matched_tracks)} tracks matched the mood '{mood}' with similarity ≥ 0.4")
+    print(f"[INFO] {len(matched_tracks)} tracks matched the mood '{mood}' with similarity ≥ 0.35")
     return matched_tracks
 
 
