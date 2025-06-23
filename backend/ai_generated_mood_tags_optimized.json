@@ -1,0 +1,62 @@
+{
+  "happy": [
+    "happy",
+    "feel good",
+    "upbeat",
+    "cheerful",
+    "sunny",
+    "dance",
+    "funk",
+    "groovy",
+    "catchy",
+    "fun"
+  ],
+  "sad": [
+    "sad",
+    "melancholy",
+    "emotional",
+    "depressing",
+    "slow",
+    "dark",
+    "heartbreak",
+    "sombre",
+    "tragic",
+    "moody"
+  ],
+  "energetic": [
+    "energetic",
+    "high energy",
+    "powerful",
+    "hype",
+    "adrenaline",
+    "fast",
+    "intense",
+    "electronic",
+    "aggressive",
+    "workout"
+  ],
+  "relaxed": [
+    "chill",
+    "relax",
+    "calm",
+    "smooth",
+    "laid back",
+    "downtempo",
+    "ambient",
+    "dreamy",
+    "soothing",
+    "lofi"
+  ],
+  "focus": [
+    "instrumental",
+    "focus",
+    "study",
+    "minimal",
+    "ambient",
+    "meditative",
+    "background music",
+    "deep concentration",
+    "new age",
+    "calming"
+  ]
+}
