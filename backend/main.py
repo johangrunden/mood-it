@@ -7,6 +7,7 @@ import os, base64, time, json
 from sentence_transformers import SentenceTransformer
 import numpy as np
 from embedding_init import model, centroids
+from urllib.parse import quote_plus
 
 load_dotenv()
 
@@ -14,6 +15,7 @@ CLIENT_ID = os.getenv("SPOTIFY_CLIENT_ID")
 CLIENT_SECRET = os.getenv("SPOTIFY_CLIENT_SECRET")
 REDIRECT_URI = os.getenv("SPOTIFY_REDIRECT_URI")
 FRONTEND_URL = os.getenv("FRONTEND_URL")
+LASTFM_API_KEY = os.getenv("LASTFM_API_KEY")
 
 app = FastAPI()
 
@@ -111,69 +113,58 @@ def mood_tracks(mood: str):
     all_items = fetch_all_liked_tracks(headers)
     print(f"[INFO] Total liked tracks fetched: {len(all_items)}")
 
-    artist_ids = {
-        item["track"]["artists"][0]["id"]
-        for item in all_items
-        if item.get("track")
-    }
-    print(f"[INFO] Unique artist IDs found: {len(artist_ids)}")
-
-    # Fetch artist genres
-    artist_genre_map = {}
-    artist_id_list = list(artist_ids)
-    for i in range(0, len(artist_id_list), 50):
-        batch = artist_id_list[i:i + 50]
-        print(f"[INFO] Fetching genres for artist batch {i // 50 + 1} ({len(batch)} artists)")
-        while True:
-            r = requests.get(
-                "https://api.spotify.com/v1/artists",
-                params={"ids": ",".join(batch)},
-                headers=headers
-            )
-            if r.status_code == 429:
-                retry_after = int(r.headers.get("Retry-After", 5))
-                print(f"[WARNING] Rate limited. Retrying in {retry_after} seconds...")
-                time.sleep(retry_after)
-                continue
-            try:
-                r.raise_for_status()
-                for artist in r.json().get("artists", []):
-                    genres = artist.get("genres", [])
-                    artist_genre_map[artist["id"]] = genres
-                    print(f"[DEBUG] Artist: {artist['name']} | Genres: {genres}")
-                break
-            except requests.exceptions.HTTPError as e:
-                print(f"[ERROR] Failed to fetch artist batch {i // 50 + 1}: {e}")
-                break
-
-    # Classification time, calculate cosine similarity with the specific mood-centroid
     mood_vec = centroids[mood]
     matched_tracks = []
+
     for item in all_items:
         track = item.get("track")
         if not track:
             continue
 
-        artist = track["artists"][0]
-        artist_genres = artist_genre_map.get(artist["id"], [])
-        if not artist_genres:
-            continue
+        artist_name = track["artists"][0]["name"]
+        track_name = track["name"]
+        encoded_artist = quote_plus(artist_name)
+        encoded_track = quote_plus(track_name)
 
-        genre_string = " ".join(artist_genres)
-        genre_vec = model.encode(genre_string)
-        sim = np.dot(mood_vec, genre_vec) / (np.linalg.norm(mood_vec) * np.linalg.norm(genre_vec))
-        print(f"[DEBUG] Track: {track['name']} | Artist: {artist['name']} | Similarity to '{mood}': {sim:.3f}")
+        url = (
+            f"https://ws.audioscrobbler.com/2.0/"
+            f"?method=track.gettoptags"
+            f"&artist={encoded_artist}"
+            f"&track={encoded_track}"
+            f"&api_key={os.getenv('LASTFM_API_KEY')}"
+            f"&format=json"
+        )
 
-        if sim >= 0.55:  # Adjust threshold if needed
-            matched_tracks.append({
-                "name": track["name"],
-                "artist": artist["name"],
-                "uri": track["uri"],
-                "similarity": round(float(sim), 3)
-            })
+        try:
+            r = requests.get(url)
+            r.raise_for_status()
+            tag_data = r.json().get("toptags", {}).get("tag", [])
+            tags = [t["name"].lower() for t in tag_data if int(t.get("count", 0)) > 10]
+            tag_string = " ".join(tags)
 
-    print(f"[INFO] {len(matched_tracks)} tracks matched the mood '{mood}' with similarity ≥ 0.6")
+            if not tag_string.strip():
+                continue
+
+            tag_vec = model.encode(tag_string)
+            sim = np.dot(mood_vec, tag_vec) / (np.linalg.norm(mood_vec) * np.linalg.norm(tag_vec))
+            print(f"[DEBUG] Track: '{track_name}' by '{artist_name}' | Tags: {tags} | Similarity to '{mood}': {sim:.3f}")
+
+            if sim >= 0.4:
+                matched_tracks.append({
+                    "name": track_name,
+                    "artist": artist_name,
+                    "uri": track["uri"],
+                    "similarity": round(float(sim), 3)
+                })
+
+        except Exception as e:
+            print(f"[WARNING] Failed to fetch tags for '{track_name}' by '{artist_name}': {e}")
+
+        time.sleep(0.2)  # Respect API rate limits
+
+    print(f"[INFO] {len(matched_tracks)} tracks matched the mood '{mood}' with similarity ≥ 0.4")
     return matched_tracks
+
 
 @app.post("/create-playlist")
 def create_playlist(payload: dict = Body(...)):
