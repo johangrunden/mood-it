@@ -6,7 +6,7 @@ from sentence_transformers import SentenceTransformer
 model = SentenceTransformer("sentence-transformers/all-mpnet-base-v2")
 
 # Load optimized mood-to-genre mapping
-with open("ai_generated_mood_tags_optimized.json", "r", encoding="utf-8") as f:
+with open("ai_generated_mood_genres.json", "r", encoding="utf-8") as f:
     MOOD_GENRES = json.load(f)
 
 # Compute centroid vector per mood
