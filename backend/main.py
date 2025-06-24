@@ -45,7 +45,6 @@ def login():
 
 @app.get("/callback")
 def callback(code: str):
-    global ACCESS_TOKEN
     token_url = f"{SPOTIFY_AUTH_BASE}/api/token"
     auth_header = base64.b64encode(f"{CLIENT_ID}:{CLIENT_SECRET}".encode()).decode()
     headers = {
@@ -59,16 +58,25 @@ def callback(code: str):
     }
     response = requests.post(token_url, headers=headers, data=data)
     token_data = response.json()
-    ACCESS_TOKEN = token_data.get("access_token", "")
-    return RedirectResponse(FRONTEND_URL)
+    access_token = token_data.get("access_token", "")
+
+    resp = RedirectResponse(FRONTEND_URL)
+    resp.set_cookie(
+        key="access_token",
+        value=access_token,
+        httponly=True,
+        secure=False,
+        samesite="Lax",
+        max_age=3600
+    )
+    return resp
 
 @app.get("/me")
-def get_user_profile():
-    access_token = ACCESS_TOKEN 
-    if not access_token:
+def get_user_profile(request: Request):
+    token = request.cookies.get("access_token")
+    if not token:
         return JSONResponse(status_code=401, content={"error": "Not authenticated"})
-
-    headers = {"Authorization": f"Bearer {access_token}"}
+    headers = {"Authorization": f"Bearer {token}"}
     response = requests.get(f"{SPOTIFY_API_BASE}/me", headers=headers)
 
     if response.status_code != 200:
@@ -100,12 +108,11 @@ def fetch_all_liked_tracks(headers):
     return all_tracks
 
 @app.get("/all-liked-tracks")
-def all_liked_tracks():
-    global ACCESS_TOKEN
-    if not ACCESS_TOKEN:
+def all_liked_tracks(request: Request):
+    token = request.cookies.get("access_token")
+    if not token:
         return JSONResponse(status_code=401, content={"error": "Not authenticated"})
-
-    headers = {"Authorization": f"Bearer {ACCESS_TOKEN}"}
+    headers = {"Authorization": f"Bearer {token}"}
     all_items = fetch_all_liked_tracks(headers)
 
     result = [
@@ -164,12 +171,12 @@ def classify_song_by_mood(song: dict, mood_vec: np.ndarray, threshold: float = 0
 
 
 @app.get("/mood-tracks")
-def mood_tracks(mood: str):
-    global ACCESS_TOKEN
-    if not ACCESS_TOKEN:
+def mood_tracks(request: Request, mood: str):
+    token = request.cookies.get("access_token")
+    if not token:
         return JSONResponse(status_code=401, content={"error": "Not authenticated"})
+    headers = {"Authorization": f"Bearer {token}"}
 
-    headers = {"Authorization": f"Bearer {ACCESS_TOKEN}"}
     liked_items = fetch_all_liked_tracks(headers)
     print(f"[INFO] Total liked tracks fetched: {len(liked_items)}")
 
@@ -224,9 +231,9 @@ def mood_tracks(mood: str):
     return matched_tracks
 
 @app.post("/create-playlist")
-def create_playlist(payload: dict = Body(...)):
-    global ACCESS_TOKEN
-    if not ACCESS_TOKEN:
+def create_playlist(request: Request, payload: dict = Body(...)):
+    token = request.cookies.get("access_token")
+    if not token:
         return JSONResponse(status_code=401, content={"error": "Not authenticated"})
 
     # Extract mood and track URIs from request body
@@ -236,7 +243,7 @@ def create_playlist(payload: dict = Body(...)):
         return JSONResponse(status_code=400, content={"error": "No tracks provided"})
 
     headers = {
-        "Authorization": f"Bearer {ACCESS_TOKEN}",
+        "Authorization": f"Bearer {token}",
         "Content-Type": "application/json"
     }
 
