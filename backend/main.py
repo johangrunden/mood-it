@@ -62,6 +62,21 @@ def callback(code: str):
     ACCESS_TOKEN = token_data.get("access_token", "")
     return RedirectResponse(FRONTEND_URL)
 
+@app.get("/me")
+def get_user_profile():
+    access_token = ACCESS_TOKEN 
+    if not access_token:
+        return JSONResponse(status_code=401, content={"error": "Not authenticated"})
+
+    headers = {"Authorization": f"Bearer {access_token}"}
+    response = requests.get(f"{SPOTIFY_API_BASE}/me", headers=headers)
+
+    if response.status_code != 200:
+        return JSONResponse(status_code=response.status_code, content={"error": "Failed to fetch user profile"})
+
+    data = response.json()
+    return {"display_name": data.get("display_name")}
+
 def fetch_all_liked_tracks(headers):
     all_tracks = []
     limit = 50

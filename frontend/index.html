@@ -8,7 +8,10 @@
 <body>
     <h1>Mood It</h1>
     <div id="app">
-        <button onclick="login()">Login with Spotify</button>
+        <div id="user-section">
+            <button id="login-btn" onclick="login()">Login with Spotify</button>
+            <p id="user-greeting" style="display: none;"></p>
+        </div>
 
         <h2>Choose your mood:</h2>
         <div id="mood-buttons">

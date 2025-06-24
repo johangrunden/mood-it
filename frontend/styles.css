@@ -18,3 +18,8 @@ button {
 button:hover {
     background-color: #17a74a;
 }
+#user-greeting {
+    font-size: 20px;
+    margin-top: 5px;
+    color: #333;
+}
