@@ -9,7 +9,9 @@ function login() {
 document.addEventListener('DOMContentLoaded', checkLoginStatus);
 
 function checkLoginStatus() {
-  fetch('http://127.0.0.1:8000/me')
+  fetch('http://127.0.0.1:8000/me', {
+    credentials: 'include'
+  })
     .then(res => {
       if (!res.ok) throw new Error('Not logged in');
       return res.json();
@@ -29,7 +31,9 @@ function checkLoginStatus() {
 
 // Fetch and render all liked tracks (unfiltered)
 function showAllLiked() {
-  fetch('http://127.0.0.1:8000/all-liked-tracks')
+  fetch('http://127.0.0.1:8000/all-liked-tracks', {
+    credentials: 'include'
+  })
     .then(res => res.json())
     .then(data => {
       const list = document.getElementById('track-list');
@@ -56,7 +60,9 @@ function showAllLiked() {
 // Called when a mood button is clicked
 function selectMood(mood) {
   currentMood = mood;
-  fetch(`http://127.0.0.1:8000/mood-tracks?mood=${mood}`)
+  fetch(`http://127.0.0.1:8000/mood-tracks?mood=${mood}`, {
+    credentials: 'include'
+  })
     .then(res => res.json())
     .then(data => {
       // Update the track list in the UI and store URIs
