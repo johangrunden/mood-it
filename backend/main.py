@@ -9,6 +9,9 @@ from embedding_init import model, centroids
 
 load_dotenv()
 
+SPOTIFY_API_BASE = "https://api.spotify.com/v1"
+SPOTIFY_AUTH_BASE = "https://accounts.spotify.com"
+
 CLIENT_ID = os.getenv("SPOTIFY_CLIENT_ID")
 CLIENT_SECRET = os.getenv("SPOTIFY_CLIENT_SECRET")
 REDIRECT_URI = os.getenv("SPOTIFY_REDIRECT_URI")
@@ -32,18 +35,18 @@ def root():
 def login():
     scope = "user-library-read playlist-modify-public user-read-private"
     redirect_url = (
-        "https://accounts.spotify.com/authorize"
-        f"?client_id={CLIENT_ID}"
-        "&response_type=code"
-        f"&redirect_uri={REDIRECT_URI}"
-        f"&scope={scope}"
+    f"{SPOTIFY_AUTH_BASE}/authorize"
+    f"?client_id={CLIENT_ID}"
+    "&response_type=code"
+    f"&redirect_uri={REDIRECT_URI}"
+    f"&scope={scope}"
     )
     return RedirectResponse(redirect_url)
 
 @app.get("/callback")
 def callback(code: str):
     global ACCESS_TOKEN
-    token_url = "https://accounts.spotify.com/api/token"
+    token_url = f"{SPOTIFY_AUTH_BASE}/api/token"
     auth_header = base64.b64encode(f"{CLIENT_ID}:{CLIENT_SECRET}".encode()).decode()
     headers = {
         "Authorization": f"Basic {auth_header}",
@@ -66,7 +69,7 @@ def fetch_all_liked_tracks(headers):
 
     # Max-limit is 50 so fetch in batches
     while True:
-        url = f"https://api.spotify.com/v1/me/tracks?limit={limit}&offset={offset}"
+        url = f"{SPOTIFY_API_BASE}/me/tracks?limit={limit}&offset={offset}"
         response = requests.get(url, headers=headers)
         if response.status_code != 200:
             break
@@ -100,13 +103,12 @@ def all_liked_tracks():
 
     return result
 
-# Batch-fetch artist genres with built-in retry handling for 429
 def batch_fetch_artist_genres(artist_ids, headers):
     artist_genres = {}
     for i in range(0, len(artist_ids), 50):
         batch = artist_ids[i:i + 50]
         ids_param = ",".join(batch)
-        url = f"https://api.spotify.com/v1/artists?ids={ids_param}"
+        url = f"{SPOTIFY_API_BASE}/artists?ids={ids_param}"
 
         while True:
             resp = requests.get(url, headers=headers)
@@ -127,6 +129,24 @@ def batch_fetch_artist_genres(artist_ids, headers):
         time.sleep(0.1)
 
     return artist_genres
+
+def classify_song_by_mood(song: dict, mood_vec: np.ndarray, threshold: float = 0.6):
+    """
+    Classifies a single song against a mood vector using genre or fallback <Song name> by <Artist name>.
+    """
+    if song["genres"]:
+        text_input = " ".join(song["genres"]).lower()
+        source = "genres"
+    else:
+        text_input = f"{song['name']} by {song['artist']}".lower()
+        source = "fallback_text"
+
+    tag_vec = model.encode(text_input)
+    sim = np.dot(mood_vec, tag_vec) / (np.linalg.norm(mood_vec) * np.linalg.norm(tag_vec))
+
+    matched = sim >= threshold
+    return matched, sim, source
+
 
 @app.get("/mood-tracks")
 def mood_tracks(mood: str):
@@ -173,19 +193,11 @@ def mood_tracks(mood: str):
 
     # Step 5: Classify all songs (use fallback text if no genres found)
     for song in song_entries:
-        if song["genres"]:
-            text_input = " ".join(song["genres"]).lower()
-            source = "genres"
-        else:
-            text_input = f"{song['name']} by {song['artist']}".lower()
-            source = "fallback_text"
-
-        tag_vec = model.encode(text_input)
-        sim = np.dot(mood_vec, tag_vec) / (np.linalg.norm(mood_vec) * np.linalg.norm(tag_vec))
+        matched, sim, source = classify_song_by_mood(song, mood_vec)
 
         print(f"[DEBUG] [{source}] Track: '{song['name']}' by '{song['artist']}' | Similarity to mood '{mood}': {sim:.3f}")
 
-        if sim >= 0.6:
+        if matched:
             matched_tracks.append({
                 "name": song["name"],
                 "artist": song["artist"],
@@ -214,7 +226,7 @@ def create_playlist(payload: dict = Body(...)):
     }
 
     # Fetch current user's Spotify ID
-    profile_resp = requests.get("https://api.spotify.com/v1/me", headers=headers)
+    profile_resp = requests.get(f"{SPOTIFY_API_BASE}/me", headers=headers)
     if profile_resp.status_code != 200:
         return JSONResponse(status_code=profile_resp.status_code,
                             content={"error": "Failed to fetch user profile"})
@@ -227,7 +239,7 @@ def create_playlist(payload: dict = Body(...)):
         "public": True
     }
     create_resp = requests.post(
-        f"https://api.spotify.com/v1/users/{user_id}/playlists",
+        f"{SPOTIFY_API_BASE}/users/{user_id}/playlists",
         headers=headers,
         json=playlist_body
     )
@@ -242,7 +254,7 @@ def create_playlist(payload: dict = Body(...)):
     for i in range(0, len(uris), 100):
         batch = uris[i:i + 100]
         add_resp = requests.post(
-            f"https://api.spotify.com/v1/playlists/{playlist_id}/tracks",
+            f"{SPOTIFY_API_BASE}/playlists/{playlist_id}/tracks",
             headers=headers,
             json={"uris": batch}
         )
