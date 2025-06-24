@@ -6,6 +6,27 @@ function login() {
   window.location.href = 'http://127.0.0.1:8000/login';
 }
 
+document.addEventListener('DOMContentLoaded', checkLoginStatus);
+
+function checkLoginStatus() {
+  fetch('http://127.0.0.1:8000/me')
+    .then(res => {
+      if (!res.ok) throw new Error('Not logged in');
+      return res.json();
+    })
+    .then(data => {
+      const loginBtn = document.getElementById('login-btn');
+      const greeting = document.getElementById('user-greeting');
+      loginBtn.style.display = 'none';
+      greeting.textContent = `Hi, ${data.display_name}`;
+      greeting.style.display = 'inline';
+    })
+    .catch(() => {
+      // Not logged in – show login button
+    });
+}
+
+
 // Fetch and render all liked tracks (unfiltered)
 function showAllLiked() {
   fetch('http://127.0.0.1:8000/all-liked-tracks')
@@ -88,3 +109,5 @@ function createPlaylist() {
     }
   });
 }
+
+
