@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 from services.SpotifyService import getLoginRedirectUrl, exchangeCodeAndSetCookie, getUserProfile
+from services.TokenService import requireTokenOrUnauthorized
 
 router = APIRouter()
 
@@ -14,11 +15,7 @@ def callback(code: str):
 
 @router.get("/me")
 def get_me(request: Request):
-    token = request.cookies.get("access_token")
-    if not token:
-        return JSONResponse(status_code=401, content={"error": "Not authenticated"})
-
-    user = getUserProfile(token)
+    user = getUserProfile(requireTokenOrUnauthorized(request))
     if not user:
         return JSONResponse(status_code=500, content={"error": "Failed to get user profile"})
 
