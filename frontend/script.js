@@ -104,7 +104,8 @@ function createPlaylist() {
   fetch('http://127.0.0.1:8000/create-playlist', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ mood: currentMood, uris })
+    body: JSON.stringify({ mood: currentMood, uris }),
+    credentials: 'include'
   })
   .then(res => res.json())
   .then(data => {
