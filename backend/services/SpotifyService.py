@@ -85,7 +85,7 @@ def getUserProfile(token: str):
 
     return response.json()
 
-def fetch_all_liked_tracks(headers: Dict[str, str]) -> List[dict]:
+def fetchAllLikedTracks(headers: Dict[str, str]) -> List[dict]:
     """
     Retrieves all liked tracks for the user in batches of 50.
     """
@@ -109,7 +109,7 @@ def fetch_all_liked_tracks(headers: Dict[str, str]) -> List[dict]:
 
     return all_tracks
 
-def batch_fetch_artist_genres(artist_ids: List[str], headers: Dict[str, str]) -> Dict[str, List[str]]:
+def batchFetchArtistGenres(artist_ids: List[str], headers: Dict[str, str]) -> Dict[str, List[str]]:
     """
     Retrieves genres for a batch of Spotify artist IDs, with retry on rate limiting.
     """
