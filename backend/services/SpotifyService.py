@@ -16,7 +16,7 @@ REDIRECT_URI = os.getenv("SPOTIFY_REDIRECT_URI")
 FRONTEND_URL = os.getenv("FRONTEND_URL")
 
 
-def get_login_redirect_url() -> RedirectResponse:
+def getLoginRedirectUrl() -> RedirectResponse:
     """
     Returns a redirect response to Spotify's authorization URL.
     """
@@ -31,7 +31,7 @@ def get_login_redirect_url() -> RedirectResponse:
     return RedirectResponse(redirect_url)
 
 
-def exchange_code_and_set_cookie(code: str):
+def exchangeCodeAndSetCookie(code: str):
     """
     Exchanges an authorization code for an access token and sets it as a cookie.
     """
@@ -72,7 +72,7 @@ def exchange_code_for_token(code: str) -> str | None:
     print(f"[WARNING] Failed to exchange token: {response.status_code}")
     return None
 
-def get_user_profile(token: str):
+def getUserProfile(token: str):
     """
     Retrieves the user's Spotify profile using the access token.
     """
@@ -137,7 +137,7 @@ def batch_fetch_artist_genres(artist_ids: List[str], headers: Dict[str, str]) ->
 
     return artist_genres
 
-def create_playlist_for_user(user_id: str, mood: str, uris: List[str], headers: Dict[str, str]) -> str | None:
+def createPlaylistForUser(user_id: str, mood: str, uris: List[str], headers: Dict[str, str]) -> str | None:
     """
     Creates a public playlist for the given user and adds tracks to it.
     """
