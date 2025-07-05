@@ -15,7 +15,12 @@ def callback(code: str):
 
 @router.get("/me")
 def get_me(request: Request):
-    user = getUserProfile(requireTokenOrUnauthorized(request))
+
+    tokenOrResponse = requireTokenOrUnauthorized(request)
+    if isinstance(tokenOrResponse, JSONResponse):
+        return tokenOrResponse
+        
+    user = getUserProfile(tokenOrResponse)
     if not user:
         return JSONResponse(status_code=500, content={"error": "Failed to get user profile"})
 
