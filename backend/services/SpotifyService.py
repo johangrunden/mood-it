@@ -4,6 +4,7 @@ import requests
 from typing import List, Dict
 from dotenv import load_dotenv
 from fastapi.responses import RedirectResponse, JSONResponse
+from services.TokenService import setTokenCookie
 
 load_dotenv()
 
@@ -35,23 +36,15 @@ def exchangeCodeAndSetCookie(code: str):
     """
     Exchanges an authorization code for an access token and sets it as a cookie.
     """
-    token = exchange_code_for_token(code)
+    token = exchangeCodeForToken(code)
     if not token:
         return JSONResponse(status_code=400, content={"error": "Token exchange failed"})
 
     response = RedirectResponse(FRONTEND_URL)
-    response.set_cookie(
-        key="access_token",
-        value=token,
-        httponly=True,
-        secure=False,
-        samesite="Lax",
-        max_age=3600
-    )
-    return response
+    return setTokenCookie(response, token)
 
 
-def exchange_code_for_token(code: str) -> str | None:
+def exchangeCodeForToken(code: str) -> str | None:
     """
     Exchanges an authorization code for an access token using Spotify's token endpoint.
     """
@@ -73,9 +66,6 @@ def exchange_code_for_token(code: str) -> str | None:
     return None
 
 def getUserProfile(token: str):
-    """
-    Retrieves the user's Spotify profile using the access token.
-    """
     headers = {"Authorization": f"Bearer {token}"}
     response = requests.get(f"{SPOTIFY_API_BASE}/me", headers=headers)
 
@@ -138,9 +128,6 @@ def batchFetchArtistGenres(artist_ids: List[str], headers: Dict[str, str]) -> Di
     return artist_genres
 
 def createPlaylistForUser(user_id: str, mood: str, uris: List[str], headers: Dict[str, str]) -> str | None:
-    """
-    Creates a public playlist for the given user and adds tracks to it.
-    """
     playlist_body = {
         "name": f"Mood It – {mood.capitalize()}",
         "description": f"Automatically generated playlist for mood: {mood}",

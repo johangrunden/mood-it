@@ -10,15 +10,16 @@ def requireTokenOrUnauthorized(request: Request) -> str | JSONResponse:
         return JSONResponse(status_code=401, content={"error": "Not authenticated"})
     return token
 
-def setTokenCookie(response: Response, token: str):
+def setTokenCookie(response: Response, token: str) -> Response:
     response.set_cookie(
         key="access_token",
         value=token,
         httponly=True,
-        secure=False,
+        secure=False,  # Set to True in production
         samesite="Lax",
         max_age=3600
     )
+    return response
 
 def getAuthHeaders(token: str) -> dict:
     return {"Authorization": f"Bearer {token}",
