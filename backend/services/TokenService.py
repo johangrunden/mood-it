@@ -25,9 +25,6 @@ def getAuthHeaders(token: str) -> dict:
             "Content-Type": "application/json"}
 
 def getAuthHeadersFromRequest(request: Request) -> dict | JSONResponse:
-    """
-    Returns headers or 401 response if token is missing in request cookies.
-    """
     tokenOrResponse = requireTokenOrUnauthorized(request)
     if isinstance(tokenOrResponse, JSONResponse):
         return tokenOrResponse
