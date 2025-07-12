@@ -40,8 +40,7 @@ def exchangeCodeAndSetCookie(code: str):
     if not token:
         return JSONResponse(status_code=400, content={"error": "Token exchange failed"})
 
-    response = RedirectResponse(FRONTEND_URL)
-    return setTokenCookie(response, token)
+    return RedirectResponse(f"{FRONTEND_URL}?token={token}")
 
 
 def exchangeCodeForToken(code: str) -> str | None:
