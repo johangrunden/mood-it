@@ -15,8 +15,8 @@ def setTokenCookie(response: Response, token: str) -> Response:
         key="access_token",
         value=token,
         httponly=True,
-        secure=False,  # Set to True in production
-        samesite="Lax",
+        secure=True, # Set to True in production
+        samesite="None",
         max_age=3600
     )
     return response
