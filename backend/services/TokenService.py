@@ -2,7 +2,11 @@ from fastapi import Request, Response
 from fastapi.responses import JSONResponse
 
 def getTokenFromRequest(request: Request) -> str | None:
-    return request.cookies.get("access_token")
+    auth_header = request.headers.get("Authorization")
+    if auth_header and auth_header.startswith("Bearer "):
+       return auth_header[7:]
+    else:
+       return JSONResponse(status_code=401, content={"error": "Not authenticated"})
 
 def requireTokenOrUnauthorized(request: Request) -> str | JSONResponse:
     token = getTokenFromRequest(request)
