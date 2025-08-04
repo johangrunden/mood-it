@@ -13,13 +13,10 @@ It scans your liked songs artist-genres. The artist-genres are used to filter th
 
 Tech:
 
-Backend: 
 Python, FastAPI, uvicorn, SenSentenceTransformer, Embedded Classification
-Frontend: 
-HTML and JavaScript
 
 Setup:
 1. Install Python
 2. Install dependencies: pip install -r requirements.txt
-3. Add .env with SPOTIFY_CLIENT_ID,SPOTIFY_CLIENT_SECRET, and SPOTIFY_REDIRECT_URI
+3. Add .env with FRONTEND_URL, SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET, and SPOTIFY_REDIRECT_URI
 4. Run backend: uvicorn main:app --reload
